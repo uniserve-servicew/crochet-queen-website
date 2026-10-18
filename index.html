@@ -372,7 +372,7 @@ const STORE = {
   locale: "en-IN"
 };
 
-const products = [
+const sampleProducts = [
   {id:1,name:"Daisy Daydream",category:"Flowers",price:499,description:"A cheerful crochet bloom that never wilts.",emoji:"🌼",tag:"Bestseller",image:"https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=700&q=80",amazonUrl:""},
   {id:2,name:"Little Honey Bear",category:"Plushies",price:699,description:"A soft little friend for big little hugs.",emoji:"🧸",tag:"Made with love",image:"https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=700&q=80",amazonUrl:""},
   {id:3,name:"Blush Bloom Bouquet",category:"Flowers",price:899,description:"A forever bouquet for your favourite person.",emoji:"💐",tag:"Gift favourite",image:"https://images.unsplash.com/photo-1520763185298-1b434c919102?auto=format&fit=crop&w=700&q=80",amazonUrl:""},
@@ -382,6 +382,9 @@ const products = [
   {id:7,name:"Sunny Mini Charm",category:"Accessories",price:249,description:"A tiny handmade detail to brighten your day.",emoji:"☀️",tag:"Pocket-sized joy",image:"https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=700&q=80",amazonUrl:""},
   {id:8,name:"Pastel Pocket Pal",category:"Plushies",price:549,description:"A colourful little pal made for gifting.",emoji:"🌈",tag:"Just because",image:"https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=700&q=80",amazonUrl:""}
 ];
+
+let products = sampleProducts;
+let showingSampleProducts = true;
 
 let activeCategory = "All";
 let searchTerm = "";
@@ -398,6 +401,89 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
+/* SUPABASE_CROCHET_QUEEN_CONFIG */
+const SUPABASE_URL = "https://unyyntkqsdneqpwljyzr.supabase.co";
+const SUPABASE_PUBLIC_KEY = "sb_publishable_bd0t2CAtSG7LB8Yyuhn4xA_MncaKrnS";
+
+function escapeProductText(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+async function loadSupabaseProducts() {
+  try {
+    const endpoint = SUPABASE_URL +
+      "/rest/v1/products?select=id,name,category,price_inr,description,emoji,tag,image_url,amazon_url" +
+      "&is_published=eq.true&order=created_at.desc";
+
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "apikey": SUPABASE_PUBLIC_KEY,
+        "Authorization": "Bearer " + SUPABASE_PUBLIC_KEY
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Supabase product request failed: HTTP " + response.status);
+    }
+
+    const rows = await response.json();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.info("No published Supabase products yet; showing sample products.");
+      return;
+    }
+
+    const mapped = rows.map(row => {
+      const imageValue = String(row.image_url ?? "");
+      let safeImage = "";
+      try {
+        const parsedImage = new URL(imageValue);
+        if (parsedImage.protocol === "https:") safeImage = parsedImage.href;
+      } catch (_) {}
+
+      const amazonValue = String(row.amazon_url ?? "");
+      let safeAmazon = "";
+      try {
+        const parsedAmazon = new URL(amazonValue);
+        if (parsedAmazon.protocol === "https:" &&
+            /(^|\.)amazon\./i.test(parsedAmazon.hostname)) {
+          safeAmazon = parsedAmazon.href;
+        }
+      } catch (_) {}
+
+      const price = Number(row.price_inr);
+      return {
+        id: String(row.id),
+        name: escapeProductText(row.name),
+        category: escapeProductText(row.category),
+        price: Number.isFinite(price) ? price : 0,
+        description: escapeProductText(row.description),
+        emoji: escapeProductText(row.emoji || "🧶"),
+        tag: escapeProductText(row.tag || "Handmade"),
+        image: safeImage,
+        amazonUrl: safeAmazon
+      };
+    }).filter(product => product.name && product.category);
+
+    if (mapped.length === 0) {
+      console.warn("No usable published products were returned; showing sample products.");
+      return;
+    }
+
+    products = mapped;
+    showingSampleProducts = false;
+    renderProducts();
+    console.info("Published Crochet Queen products loaded from Supabase:", mapped.length);
+  } catch (error) {
+    console.warn("Supabase products could not be loaded; keeping sample products.", error);
+  }
+}
 function renderProducts() {
   cancelCardFlipSchedule();
   flipRound = 0;
@@ -428,7 +514,7 @@ function renderProducts() {
             <div class="product-category">${p.category}</div>
             <h3>${p.name}</h3>
             <p class="product-desc">${p.description}</p>
-            <div class="product-bottom"><span class="price">${money(p.price)}<span class="price-note">Sample price</span></span><span aria-hidden="true">${p.emoji}</span></div>
+            <div class="product-bottom"><span class="price">${money(p.price)}${showingSampleProducts ? '<span class="price-note">Sample price</span>' : ''}</span><span aria-hidden="true">${p.emoji}</span></div>
             <div class="product-order">
               <button class="mini-button" type="button" data-action="amazon" data-id="${p.id}">Amazon ↗</button>
               <button class="mini-button" type="button" data-action="direct" data-id="${p.id}">Order direct ♡</button>
@@ -442,7 +528,7 @@ function renderProducts() {
             <h3>${p.name}</h3>
             <p class="product-desc">${p.description}</p>
             <div class="product-bottom">
-              <span class="price">${money(p.price)}<span class="price-note">Sample price</span></span>
+              <span class="price">${money(p.price)}${showingSampleProducts ? '<span class="price-note">Sample price</span>' : ''}</span>
             </div>
             <div class="product-order">
               <button class="mini-button" type="button" data-action="direct" data-id="${p.id}">Order direct ♡</button>
@@ -559,7 +645,7 @@ grid.addEventListener("click",event => {
   }
   const button = event.target.closest("button[data-action]");
   if (!button) return;
-  const product = products.find(p => p.id === Number(button.dataset.id));
+  const product = products.find(p => String(p.id) === button.dataset.id);
   if (!product) return;
   if (button.dataset.action === "amazon") {
     if (product.amazonUrl && /^https:\/\/(www\.)?amazon\./i.test(product.amazonUrl)) {
@@ -600,6 +686,7 @@ navLinks.addEventListener("click",event => {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 renderProducts();
+loadSupabaseProducts();
 
 if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
   const observer = new IntersectionObserver(entries => {
