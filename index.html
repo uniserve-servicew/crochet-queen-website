@@ -92,6 +92,8 @@ h2{font-family:"Playfair Display",serif;font-size:clamp(34px,4vw,48px);font-weig
 .product-card-back .product-info{width:100%}
 .product-card-back .product-order{grid-template-columns:1fr}
 .product-back-art{display:grid;place-items:center;width:94px;height:94px;margin:14px auto 4px;border-radius:32px;background:#F0C870;box-shadow:inset 4px 4px 9px #d6b35e,inset -4px -4px 9px #fff1c8;font-size:49px}
+.product-gallery{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:8px auto;max-width:100%}
+.product-gallery img{width:54px;height:54px;object-fit:cover;border-radius:10px;border:2px solid #fff;background:#fff;box-shadow:0 2px 7px #30251f20}
 .product-card:hover{transform:translateY(-5px)}
 .product-card:hover .product-card-face{box-shadow:var(--clay-shadow)}
 .product-card:hover{transform:translateY(-7px);box-shadow:var(--clay-shadow)}
@@ -166,6 +168,31 @@ footer{padding:55px 0 25px}
 @media(prefers-reduced-motion:reduce){.hero-photo .scene-glow,.hero-photo .yarn-orbit,.hero-photo .left-hand,.hero-photo .right-hand,.hero-photo .hook-motion,.hero-photo .yarn-thread,.hero-photo .sparkle-dot{animation:none!important}}
 @media(max-width:900px){.hero-grid{gap:20px}.hero-art{min-height:400px}.hero-photo{height:330px}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.product-image{height:260px}.story{padding:35px;gap:25px}.nav-links{gap:16px}}
 @media(max-width:650px){.container{width:min(100% - 28px,var(--max))}.announcement{font-size:10px}.nav{min-height:70px}.brand{font-size:21px}.brand-mark{display:block;width:72px;height:54px;object-fit:contain;flex:0 0 auto;background:#FFFCFF;border-radius:14px;padding:3px;box-sizing:border-box;box-shadow:var(--soft-shadow);transform:none}.menu-toggle{display:block}.nav-cta{display:none}.nav-links{display:none;position:absolute;top:69px;left:0;right:0;padding:20px;background:var(--cream);box-shadow:0 15px 20px #39334B10;flex-direction:column;align-items:stretch;gap:0}.nav-links.open{display:flex}.nav-links a{padding:12px 5px;border-bottom:1px solid #eee2d9}.hero{padding:40px 0 45px}.hero-grid{grid-template-columns:1fr;gap:12px}.hero h1{font-size:53px;margin:19px 0}.hero-copy{font-size:14px}.hero-art{min-height:350px;margin:0 4px}.hero-photo{height:300px;width:72%}.float-card.one{left:0;top:15%}.float-card.two{right:0;bottom:13%}.float-card{padding:10px 12px;font-size:10px}.float-card span{font-size:20px}section{padding:58px 0}.section-head{align-items:start;flex-direction:column;margin-bottom:24px}.section-head h2{font-size:37px}.categories{grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:28px}.category{padding:15px 10px}.catalog-tools{align-items:start;flex-direction:column}.search-wrap{width:100%}.product-grid{gap:12px}.product-card-face{padding:7px 7px 12px;border-radius:19px}.product-card-inner{transition-duration:.65s}.product-back-art{width:70px;height:70px;border-radius:24px;font-size:38px}.product-card-back .product-info h3{font-size:16px}.product-card-back .product-desc{min-height:0}.mini-button{min-height:42px}.heart{min-width:40px;min-height:40px}.product-image{height:180px;border-radius:14px}.product-info{padding:12px 3px 0}.product-info h3{font-size:16px}.product-desc{font-size:10px}.product-bottom{align-items:start;flex-direction:column}.product-order{grid-template-columns:1fr}.mini-button{padding:10px 4px}.story{grid-template-columns:1fr;padding:23px;border-radius:27px}.story-art{min-height:250px}.story-art img{height:250px}.story-copy h2{font-size:35px}.custom-banner{align-items:start;flex-direction:column;padding:30px 24px}.footer-top{grid-template-columns:1fr 1fr;gap:28px}.footer-top>div:first-child{grid-column:1/-1}.footer-bottom{flex-direction:column;gap:5px}}
+
+/* Full-size product photos on the flipped card */
+.product-card-back .product-flip-photo {
+    display: block;
+    width: 100%;
+    height: 225px;
+    min-height: 225px;
+    margin: 8px auto;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    flex: 0 0 225px;
+}
+.product-card-back .product-flip-photo img.product-flip-image {
+    display: block;
+    width: 100%;
+    height: 225px;
+    max-width: 100%;
+    object-fit: cover;
+    border: 0;
+    border-radius: 19px;
+    box-sizing: border-box;
+    background: #f0e5dc;
+    box-shadow: none;
+}
 </style>
 </head>
 <body>
@@ -418,7 +445,7 @@ function escapeProductText(value) {
 async function loadSupabaseProducts() {
   try {
     const endpoint = SUPABASE_URL +
-      "/rest/v1/products?select=id,name,category,price_inr,description,emoji,tag,image_url,amazon_url" +
+      "/rest/v1/products?select=id,name,category,price_inr,description,emoji,tag,image_url,image_urls,amazon_url" +
       "&is_published=eq.true&order=created_at.desc";
 
     const response = await fetch(endpoint, {
@@ -447,6 +474,20 @@ async function loadSupabaseProducts() {
         if (parsedImage.protocol === "https:") safeImage = parsedImage.href;
       } catch (_) {}
 
+      let safeGallery = row.image_urls;
+      if (typeof safeGallery === "string") {
+        try { safeGallery = JSON.parse(safeGallery); } catch (_) { safeGallery = []; }
+      }
+      if (!Array.isArray(safeGallery)) safeGallery = [];
+      safeGallery = safeGallery.map(value => {
+        try {
+          const parsed = new URL(String(value));
+          return parsed.protocol === "https:" ? parsed.href : "";
+        } catch (_) {
+          return "";
+        }
+      }).filter(Boolean).slice(0, 10);
+
       const amazonValue = String(row.amazon_url ?? "");
       let safeAmazon = "";
       try {
@@ -467,6 +508,7 @@ async function loadSupabaseProducts() {
         emoji: escapeProductText(row.emoji || "🧶"),
         tag: escapeProductText(row.tag || "Handmade"),
         image: safeImage,
+        images: safeGallery,
         amazonUrl: safeAmazon
       };
     }).filter(product => product.name && product.category);
@@ -506,15 +548,15 @@ function renderProducts() {
       <div class="product-card-inner">
         <div class="product-card-face product-card-front">
           <div class="product-image">
-            <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.style.background='#f0e5dc';this.parentElement.insertAdjacentHTML('beforeend','<div style=&quot;display:grid;place-items:center;height:100%;font-size:70px&quot;>${p.emoji}</div>')">
+            <img src="${p.image}" alt="${p.name}" loading="lazy">
             <span class="tag">${p.tag}</span>
-            <button class="heart" type="button" aria-label="Show love for ${p.name}" aria-pressed="false">♡</button>
+            
           </div>
           <div class="product-info">
             <div class="product-category">${p.category}</div>
             <h3>${p.name}</h3>
             <p class="product-desc">${p.description}</p>
-            <div class="product-bottom"><span class="price">${money(p.price)}${showingSampleProducts ? '<span class="price-note">Sample price</span>' : ''}</span><span aria-hidden="true">${p.emoji}</span></div>
+            <div class="product-bottom"><span class="price">${money(p.price)}${showingSampleProducts ? '<span class="price-note">Sample price</span>' : ''}</span></div>
             <div class="product-order">
               <button class="mini-button" type="button" data-action="amazon" data-id="${p.id}">Amazon ↗</button>
               <button class="mini-button" type="button" data-action="direct" data-id="${p.id}">Order direct ♡</button>
@@ -522,7 +564,7 @@ function renderProducts() {
           </div>
         </div>
         <div class="product-card-face product-card-back" aria-hidden="true" inert>
-          <div class="product-back-art" aria-hidden="true">${p.emoji}</div>
+          ${(() => { const first = (p.images || []).find(Boolean) || p.image; return first ? `<div class="product-flip-photo"><img class="product-flip-image" src="${escapeProductText(first)}" alt="${p.name} product photo" loading="lazy"></div>` : ""; })()}
           <div class="product-info">
             <div class="product-category">HANDMADE WITH LOVE · ${p.category}</div>
             <h3>${p.name}</h3>
@@ -538,6 +580,13 @@ function renderProducts() {
       </div>
     </article>`).join("");
 
+  Array.from(grid.querySelectorAll(".product-card")).forEach((card, index) => {
+    const product = filtered[index];
+    const allImages = [...(product.images || []), product.image]
+      .filter((url, imageIndex, list) => url && list.indexOf(url) === imageIndex);
+    card._flipImages = allImages;
+    card.dataset.flipImageIndex = allImages.length > 1 ? "0" : "-1";
+  });
   scheduleCardFlips();
 }
 
@@ -560,6 +609,18 @@ function setCardFace(card, flipped) {
   const front = card.querySelector(".product-card-front");
   const back = card.querySelector(".product-card-back");
   if (!front || !back) return;
+
+  if (flipped) {
+    const images = Array.isArray(card._flipImages) ? card._flipImages : [];
+    const image = back.querySelector(".product-flip-image");
+    if (images.length && image) {
+      const currentIndex = Number(card.dataset.flipImageIndex ?? "-1");
+      const nextIndex = (currentIndex + 1) % images.length;
+      card.dataset.flipImageIndex = String(nextIndex);
+      image.src = images[nextIndex];
+      image.alt = "Additional product photo " + (nextIndex + 2);
+    }
+  }
 
   card.classList.toggle("is-flipped", flipped);
   front.inert = flipped;
@@ -704,3 +765,5 @@ if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-mot
 </script>
 </body>
 </html>
+
+

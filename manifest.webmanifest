@@ -1,0 +1,20 @@
+{
+  "id": "./admin.html",
+  "name": "Crochet Queen Admin",
+  "short_name": "CQ Admin",
+  "description": "Secure product and photo management for Crochet Queen.",
+  "start_url": "./admin.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fffaf6",
+  "theme_color": "#854d37",
+  "icons": [
+    {
+      "src": "./admin-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

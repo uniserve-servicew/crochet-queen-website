@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crochet Queen | Admin</title>
+<style>
+:root{color-scheme:light;--ink:#30251f;--muted:#75665d;--accent:#854d37;--line:#e8ddd5;--paper:#fffaf6;--white:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#fff;padding:18px max(18px,calc((100% - 1180px)/2));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{font-size:1.4rem;margin:0}h2{font-size:1.15rem;margin:0 0 12px}
+main{max-width:1180px;margin:24px auto;padding:0 16px 50px}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+label{display:block;font-size:.9rem;font-weight:650;margin-bottom:5px}
+input,textarea,select{width:100%;font:inherit;padding:10px;border:1px solid #d8c9bf;border-radius:8px;background:#fff;color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.field{min-width:0}.wide{grid-column:1/-1}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+button{font:inherit;font-weight:650;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;background:var(--accent);color:#fff}
+button.secondary{background:#eee4dc;color:var(--ink)}
+button.danger{background:#9d3028}
+button:disabled{opacity:.55;cursor:wait}
+.muted{color:var(--muted)}.status{padding:10px 12px;border-radius:8px;background:#f2e9e1;white-space:pre-wrap;overflow-wrap:anywhere}
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.product{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff;min-width:0}
+.product h3{margin:5px 0}.product p{overflow-wrap:anywhere}
+.product img{width:100%;height:180px;object-fit:contain;background:#faf5f0;border-radius:8px}
+.gallery-preview{overflow-wrap:anywhere}
+.tag{display:inline-block;padding:3px 8px;border-radius:20px;background:#f0e5db;font-size:.8rem}
+[hidden]{display:none!important}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}header{align-items:flex-start}main{padding-left:12px;padding-right:12px}.panel{padding:15px}}
+/* Installable admin app enhancements */
+#installApp{min-height:44px;touch-action:manipulation}
+button,input,select,textarea{touch-action:manipulation}
+input,select,textarea{min-height:44px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid #d7a18d;outline-offset:2px
+}
+@media(max-width:600px){
+  header{position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  header h1{font-size:1.15rem}
+  header button{min-height:44px}
+  .products{grid-template-columns:1fr}
+  .actions button{flex:1 1 auto;min-height:44px}
+  .product img{height:225px}
+}
+</style>
+<meta name="theme-color" content="#854d37">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CQ Admin">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./admin-icon.svg">
+</head>
+<body>
+<header>
+  <h1>Crochet Queen Admin</h1>
+  <button id="installApp" class="secondary" type="button" hidden>Install App</button>
+  <button id="signOut" class="secondary" hidden>Sign out</button>
+</header>
+<main>
+  <div id="status" class="status" role="status" aria-live="polite">Initializing secure admin page...</div>
+
+  <section id="loginPanel" class="panel" hidden>
+    <h2>Administrator sign in</h2>
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="actions"><button id="loginButton" type="submit">Sign in</button></div>
+    </form>
+  </section>
+
+  <section id="dashboard" hidden>
+    <div class="panel">
+      <h2>Product management</h2>
+      <p class="muted">Only the verified administrator can manage products. Changes are saved to Supabase.</p>
+      <div class="actions">
+        <button id="newProduct" type="button">Add product</button>
+        <button id="refresh" type="button" class="secondary">Refresh products</button>
+      </div>
+    </div>
+
+    <div id="editorPanel" class="panel" hidden>
+      <h2 id="editorTitle">Add product</h2>
+      <form id="productForm">
+        <div class="grid">
+          <div class="field">
+            <label for="p_name">Product name *</label>
+            <input id="p_name" maxlength="200" required>
+          </div>
+          <div class="field">
+            <label for="p_slug">Slug *</label>
+            <input id="p_slug" maxlength="220" required>
+          </div>
+          <div class="field">
+            <label for="p_category">Category *</label>
+            <input id="p_category" maxlength="100" required>
+          </div>
+          <div class="field">
+            <label for="p_price">Price (INR) *</label>
+            <input id="p_price" type="number" min="0" step="0.01" required>
+          </div>
+          <div class="field">
+            <label for="p_emoji">Emoji</label>
+            <input id="p_emoji" maxlength="30" placeholder="Yarn">
+          </div>
+          <div class="field">
+            <label for="p_tag">Tag</label>
+            <input id="p_tag" maxlength="100" placeholder="Bestseller">
+          </div>
+          <div class="field wide">
+            <label for="p_description">Description</label>
+            <textarea id="p_description" maxlength="10000"></textarea>
+          </div>
+          <input id="p_image" type="hidden" value="">
+          <div class="field wide">
+            <label for="p_gallery">Upload product photos (up to 10 total)</label>
+            <input id="p_gallery" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+            <p class="muted">JPEG, PNG, WebP or GIF. Maximum 5 MB per file. Uploading new photos replaces the saved gallery. Select up to 10 photos.</p>
+            <p id="galleryPreview" class="muted" aria-live="polite">No new photos selected.</p>
+          </div>
+          <div class="field wide">
+            <label for="p_amazon">Amazon/product link</label>
+            <input id="p_amazon" type="url" maxlength="2000" placeholder="https://...">
+          </div>
+          <div class="field wide">
+            <label><input id="p_published" type="checkbox" style="width:auto"> Published on storefront</label>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="saveProduct" type="submit">Save product</button>
+          <button id="cancelEdit" type="button" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Product catalogue</h2>
+      <p id="productCount" class="muted">Loading products...</p>
+      <div id="products" class="products"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  "use strict";
+
+  const SUPABASE_URL = "https://unyyntkqsdneqpwljyzr.supabase.co";
+  const SUPABASE_PUBLIC_KEY = "sb_publishable_bd0t2CAtSG7LB8Yyuhn4xA_MncaKrnS";
+  const ADMIN_EMAIL = "services.uniserve@gmail.com";
+
+  const $ = id => document.getElementById(id);
+  const statusEl = $("status");
+  const loginPanel = $("loginPanel");
+  const dashboard = $("dashboard");
+  const editorPanel = $("editorPanel");
+  const productsEl = $("products");
+  const productCount = $("productCount");
+
+  let client = null;
+  let editingId = null;
+  let existingGalleryUrls = [];
+  let busy = false;
+  let authGeneration = 0;
+
+  function status(message) {
+    statusEl.textContent = message;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    document.querySelectorAll("button").forEach(button => {
+      button.disabled = value;
+    });
+  }
+
+  function signedOut(message) {
+    authGeneration++;
+    loginPanel.hidden = false;
+    dashboard.hidden = true;
+    editorPanel.hidden = true;
+    $("signOut").hidden = true;
+    productsEl.replaceChildren();
+    status(message || "Please sign in.");
+  }
+
+  function signedIn() {
+    loginPanel.hidden = true;
+    dashboard.hidden = false;
+    $("signOut").hidden = false;
+  }
+
+  function addText(parent, tag, value, className) {
+    const element = document.createElement(tag);
+    element.textContent = value == null ? "" : String(value);
+    if (className) element.className = className;
+    parent.appendChild(element);
+    return element;
+  }
+
+  function makeSlug(value) {
+    return value.toLowerCase().trim()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function resetEditor() {
+    editingId = null;
+    $("productForm").reset();
+    existingGalleryUrls = [];
+    $("galleryPreview").textContent = "No new photos selected.";
+    $("editorTitle").textContent = "Add product";
+    $("saveProduct").textContent = "Save product";
+    editorPanel.hidden = true;
+  }
+
+  function editProduct(product) {
+    editingId = product.id;
+    $("editorTitle").textContent = "Edit product";
+    $("p_name").value = product.name || "";
+    $("p_slug").value = product.slug || "";
+    $("p_category").value = product.category || "";
+    $("p_price").value = product.price_inr == null ? "" : product.price_inr;
+    $("p_description").value = product.description || "";
+    $("p_emoji").value = product.emoji || "";
+    $("p_tag").value = product.tag || "";
+    $("p_image").value = product.image_url || "";
+    existingGalleryUrls = normalizeGalleryUrls(product.image_urls);
+    $("galleryPreview").textContent =
+      "Saved gallery: " + existingGalleryUrls.length +
+      " image(s). Choose new files to replace the saved gallery.";
+    $("p_amazon").value = product.amazon_url || "";
+    $("p_published").checked = product.is_published === true;
+    $("saveProduct").textContent = "Save changes";
+    editorPanel.hidden = false;
+    editorPanel.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  async function verifyAdmin() {
+    const generation = ++authGeneration;
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+    const session = sessionData.session;
+
+    if (!session) {
+      signedOut("Please sign in with the administrator account.");
+      return false;
+    }
+
+    const email = (session.user.email || "").toLowerCase();
+    if (email !== ADMIN_EMAIL) {
+      await client.auth.signOut();
+      signedOut("Access denied. This page is restricted to the designated administrator account.");
+      return false;
+    }
+
+    status("Verifying administrator permissions...");
+    const { data, error } = await client.rpc("is_crochet_queen_admin");
+
+    if (generation !== authGeneration) return false;
+
+    if (error) {
+      signedOut("Administrator verification failed: " + error.message +
+        "\nPlease check the database function and your signed-in session.");
+      return false;
+    }
+
+    if (data !== true) {
+      signedOut("This account is not authorized as an administrator. No management controls are available.");
+      return false;
+    }
+
+    signedIn();
+    return true;
+  }
+
+  $("p_gallery").addEventListener("change", () => {
+    const files = Array.from($("p_gallery").files || []);
+    const total = files.length;
+    $("galleryPreview").textContent = files.length
+      ? files.length + " new file(s) selected; " + total +
+        " total gallery image(s). " + files.map(file => file.name).join(", ")
+      : "No new photos selected. Saved gallery: " + existingGalleryUrls.length + " image(s).";
+  });
+
+  async function loadProducts() {
+    if (busy) return;
+    const allowed = await verifyAdmin();
+    if (!allowed) return;
+
+    status("Loading products...");
+    productsEl.replaceChildren();
+    productCount.textContent = "Loading...";
+
+    const { data, error } = await client
+      .from("products")
+      .select("id,name,slug,category,price_inr,description,emoji,tag,image_url,image_urls,amazon_url,is_published,created_at,updated_at")
+      .order("created_at", {ascending:false});
+
+    if (error) {
+      status("Could not load products: " + error.message);
+      productCount.textContent = "Unable to load products.";
+      return;
+    }
+
+    productCount.textContent = data.length + " product(s), including drafts.";
+
+    if (!data.length) {
+      addText(productsEl, "p", "No products exist in Supabase yet. Select Add product to create the first one.");
+    }
+
+    data.forEach(product => {
+      const card = document.createElement("article");
+      card.className = "product";
+
+      if (product.image_url) {
+        try {
+          const imageUrl = new URL(product.image_url);
+          if (imageUrl.protocol === "https:" || imageUrl.protocol === "http:") {
+            const image = document.createElement("img");
+            image.src = imageUrl.href;
+            image.alt = product.name || "Product image";
+            image.loading = "lazy";
+            image.onerror = () => image.remove();
+            card.appendChild(image);
+          }
+        } catch (_) {}
+      }
+
+      addText(card, "span", product.is_published ? "Published" : "Draft", "tag");
+      addText(card, "h3", (product.emoji ? product.emoji + " " : "") + (product.name || "Unnamed product"));
+      addText(card, "p", "Category: " + (product.category || "-"));
+      addText(card, "p", "Price: ₹" + (Number(product.price_inr || 0).toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2})));
+      if (product.tag) addText(card, "p", "Tag: " + product.tag);
+      if (product.description) addText(card, "p", product.description);
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "secondary";
+      editButton.textContent = "Edit";
+      editButton.addEventListener("click", () => editProduct(product));
+      actions.appendChild(editButton);
+
+      const publishButton = document.createElement("button");
+      publishButton.type = "button";
+      publishButton.className = "secondary";
+      publishButton.textContent = product.is_published ? "Unpublish" : "Publish";
+      publishButton.addEventListener("click", () => togglePublished(product));
+      actions.appendChild(publishButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "danger";
+      deleteButton.textContent = "Delete";
+      deleteButton.addEventListener("click", () => deleteProduct(product));
+      actions.appendChild(deleteButton);
+
+      card.appendChild(actions);
+      productsEl.appendChild(card);
+    });
+
+    status("Products loaded successfully.");
+  }
+
+  function normalizeGalleryUrls(value) {
+    let entries = value;
+    if (typeof entries === "string") {
+      try { entries = JSON.parse(entries); } catch (_) { entries = []; }
+    }
+    if (!Array.isArray(entries)) return [];
+    return entries.filter(item => {
+      if (typeof item !== "string") return false;
+      try {
+        return new URL(item).protocol === "https:";
+      } catch (_) {
+        return false;
+      }
+    }).slice(0, 10);
+  }
+
+  async function uploadGalleryImages(files) {
+    const uploadedUrls = [];
+    const uploadedPaths = [];
+    const bucket = client.storage.from("product-images");
+
+    try {
+      for (const file of files) {
+        const extensionByType = {
+          "image/jpeg": "jpg",
+          "image/png": "png",
+          "image/webp": "webp",
+          "image/gif": "gif"
+        };
+        const extension = extensionByType[file.type];
+        if (!extension) throw new Error("Unsupported image type: " + file.name);
+
+        const uniqueId = (window.crypto && window.crypto.randomUUID)
+          ? window.crypto.randomUUID()
+          : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+
+        const objectPath = "products/" + uniqueId + "." + extension;
+        const { data, error } = await bucket.upload(objectPath, file, {
+          cacheControl: "3600",
+          contentType: file.type,
+          upsert: false
+        });
+
+        if (error) {
+          throw new Error("Image upload failed for " + file.name + ": " + error.message);
+        }
+
+        uploadedPaths.push(data.path);
+
+        const { data: publicData } = bucket.getPublicUrl(data.path);
+        if (!publicData || !publicData.publicUrl) {
+          throw new Error("The image uploaded, but its public URL could not be obtained.");
+        }
+        uploadedUrls.push(publicData.publicUrl);
+      }
+
+      return { urls: uploadedUrls, paths: uploadedPaths };
+    } catch (error) {
+      if (uploadedPaths.length) {
+        try {
+          const { error: cleanupError } = await bucket.remove(uploadedPaths);
+          if (cleanupError) {
+            console.error("Partial upload cleanup failed:", cleanupError.message);
+          }
+        } catch (cleanupException) {
+          console.error("Partial upload cleanup failed:", cleanupException);
+        }
+      }
+      throw error;
+    }
+  }
+
+  async function cleanupUploadedGalleryImages(paths) {
+    if (!paths || paths.length === 0) return "";
+    try {
+      const { error } = await client.storage.from("product-images").remove(paths);
+      return error ? error.message : "";
+    } catch (error) {
+      return error && error.message ? error.message : String(error);
+    }
+  }
+
+  async function saveProduct(event) {
+    let newlyUploadedPaths = [];
+    event.preventDefault();
+    if (busy) return;
+
+    if (!await verifyAdmin()) return;
+
+    const name = $("p_name").value.trim();
+    const slugInput = $("p_slug").value.trim();
+    const category = $("p_category").value.trim();
+    const price = Number($("p_price").value);
+    const selectedFiles = Array.from($("p_gallery").files || []);
+    const primaryImageInput = $("p_image").value.trim();
+
+    if (!name || !category || !slugInput ||
+        $("p_price").value === "" || !Number.isFinite(price) || price < 0) {
+      status("Enter a product name, slug, category, and valid non-negative price.");
+      return;
+    }
+
+    if (selectedFiles.length > 10 ||
+        selectedFiles.length > 10) {
+      status("Select no more than 10 new photos for this product.");
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    for (const file of selectedFiles) {
+      if (!allowedTypes.includes(file.type)) {
+        status("Unsupported image format: " + file.name + ". Use JPEG, PNG, WebP or GIF.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        status("Image too large: " + file.name + ". Each image must be 5 MB or smaller.");
+        return;
+      }
+    }
+
+    if (!primaryImageInput && selectedFiles.length === 0 &&
+        existingGalleryUrls.length === 0) {
+      status("A primary product image is required. Upload a photo.");
+      return;
+    }
+
+    const record = {
+      name,
+      slug: makeSlug(slugInput),
+      category,
+      price_inr: price,
+      description: $("p_description").value.trim(),
+      emoji: $("p_emoji").value.trim(),
+      tag: $("p_tag").value.trim(),
+      image_url: primaryImageInput,
+      image_urls: existingGalleryUrls.slice(),
+      amazon_url: $("p_amazon").value.trim(),
+      is_published: $("p_published").checked,
+      updated_at: new Date().toISOString()
+    };
+
+    if (!record.slug) {
+      status("Please provide a valid slug.");
+      return;
+    }
+
+    setBusy(true);
+    status("Saving product...");
+
+    try {
+      const allowed = await verifyAdmin();
+      if (!allowed) return;
+
+      if (selectedFiles.length > 0) {
+        status("Uploading product photos...");
+        const uploadResult = await uploadGalleryImages(selectedFiles);
+        newlyUploadedPaths = uploadResult.paths;
+        record.image_urls = uploadResult.urls.slice(0, 10);
+        if (uploadResult.urls.length > 0) {
+          record.image_url = uploadResult.urls[0];
+        }
+      }
+
+      if (!record.image_url && record.image_urls.length > 0) {
+        record.image_url = record.image_urls[0];
+      }
+
+      if (!record.image_url) {
+        status("A primary product image is required. Upload a photo.");
+        return;
+      }
+
+      let result;
+      if (editingId) {
+        result = await client.from("products")
+          .update(record).eq("id", editingId).select("id");
+      } else {
+        result = await client.from("products")
+          .insert(record).select("id");
+      }
+
+      if (result.error) {
+        const cleanupMessage = await cleanupUploadedGalleryImages(newlyUploadedPaths);
+        newlyUploadedPaths = [];
+        status("Save failed: " + result.error.message +
+          (cleanupMessage ? "\nWARNING: Uploaded image cleanup also failed: " + cleanupMessage : ""));
+        return;
+      }
+
+      if (!result.data || result.data.length === 0) {
+        const cleanupMessage = await cleanupUploadedGalleryImages(newlyUploadedPaths);
+        newlyUploadedPaths = [];
+        status("No product was returned by the save operation. Refresh and verify before retrying." +
+          (cleanupMessage ? "\nWARNING: Uploaded image cleanup also failed: " + cleanupMessage : ""));
+        return;
+      }
+
+      newlyUploadedPaths = [];
+      resetEditor();
+      status("Product saved successfully.");
+      await loadProducts();
+    } catch (error) {
+      const cleanupMessage = await cleanupUploadedGalleryImages(newlyUploadedPaths);
+      newlyUploadedPaths = [];
+      status("Save failed: " + (error && error.message ? error.message : String(error)) +
+        (cleanupMessage ? "\nWARNING: Uploaded image cleanup also failed: " + cleanupMessage : ""));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePublished(product) {
+    if (busy) return;
+    const action = product.is_published ? "unpublish" : "publish";
+    if (!confirm("Are you sure you want to " + action + " \"" + product.name + "\"?")) return;
+
+    setBusy(true);
+    try {
+      if (!await verifyAdmin()) return;
+
+      const { data, error } = await client.from("products")
+        .update({
+          is_published: !product.is_published,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", product.id)
+        .select("id");
+
+      if (error) {
+        status("Publish status update failed: " + error.message);
+        return;
+      }
+      if (!data || !data.length) {
+        status("No product was updated. Refresh and verify the product status.");
+        return;
+      }
+      status("Product status updated.");
+      await loadProducts();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteProduct(product) {
+    if (busy) return;
+    if (!confirm("Permanently delete \"" + product.name + "\"? This cannot be undone.")) return;
+    if (!confirm("Final confirmation: delete this product from Supabase?")) return;
+
+    setBusy(true);
+    try {
+      if (!await verifyAdmin()) return;
+
+      const { data, error } = await client.from("products")
+        .delete().eq("id", product.id).select("id");
+
+      if (error) {
+        status("Delete failed: " + error.message);
+        return;
+      }
+      if (!data || !data.length) {
+        status("No product was deleted. Refresh and verify its status.");
+        return;
+      }
+      status("Product deleted.");
+      await loadProducts();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function init() {
+    if (!window.supabase) {
+      signedOut("Supabase library did not load. Check your internet connection and reload.");
+      return;
+    }
+
+    client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY, {
+      auth: {persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
+    });
+
+    $("loginForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      if (busy) return;
+      setBusy(true);
+      status("Signing in...");
+
+      try {
+        const {error} = await client.auth.signInWithPassword({
+          email: $("email").value.trim(),
+          password: $("password").value
+        });
+        $("password").value = "";
+
+        if (error) {
+          status("Sign-in failed: " + error.message);
+          return;
+        }
+
+        const allowed = await verifyAdmin();
+        if (allowed) await loadProducts();
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    $("signOut").addEventListener("click", async () => {
+      setBusy(true);
+      try {
+        const {error} = await client.auth.signOut();
+        if (error) {
+          status("Sign-out failed: " + error.message);
+          return;
+        }
+        signedOut("You are signed out.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    $("newProduct").addEventListener("click", () => {
+      resetEditor();
+      editorPanel.hidden = false;
+      $("p_published").checked = false;
+      editorPanel.scrollIntoView({behavior:"smooth",block:"start"});
+      $("p_name").focus();
+    });
+
+    $("p_name").addEventListener("input", () => {
+      if (!editingId) $("p_slug").value = makeSlug($("p_name").value);
+    });
+
+    $("productForm").addEventListener("submit", saveProduct);
+    $("cancelEdit").addEventListener("click", resetEditor);
+    $("refresh").addEventListener("click", loadProducts);
+
+    const {data, error} = await client.auth.getSession();
+    if (error) {
+      signedOut("Could not check sign-in session: " + error.message);
+      return;
+    }
+
+    if (data.session) {
+      if (await verifyAdmin()) await loadProducts();
+    } else {
+      signedOut("Sign in with the administrator account to continue.");
+    }
+
+    client.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        signedOut("You are signed out.");
+      }
+    });
+  }
+
+  init().catch(error => {
+    signedOut("Initialization failed: " + (error && error.message ? error.message : String(error)));
+  });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js")
+        .catch(function () {
+          console.warn("Admin app offline support could not be enabled.");
+        });
+    });
+  }
+
+  var installButton = document.getElementById("installApp");
+  var installPrompt = null;
+
+  if (!installButton) return;
+
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    installButton.hidden = false;
+  });
+
+  installButton.addEventListener("click", async function () {
+    if (!installPrompt) return;
+
+    installButton.disabled = true;
+    try {
+      installPrompt.prompt();
+      await installPrompt.userChoice;
+    } catch (error) {
+      console.warn("Installation prompt was unavailable.");
+    } finally {
+      installPrompt = null;
+      installButton.hidden = true;
+      installButton.disabled = false;
+    }
+  });
+
+  window.addEventListener("appinstalled", function () {
+    installPrompt = null;
+    installButton.hidden = true;
+  });
+})();
+</script>
+</body>
+</html>
+
