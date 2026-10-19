@@ -101,7 +101,7 @@ h2{font-family:"Playfair Display",serif;font-size:clamp(34px,4vw,48px);font-weig
 .product-image img{height:100%;transition:transform .6s}
 .product-card:hover .product-image img{transform:scale(1.06)}
 .tag{position:absolute;top:11px;left:11px;background:#fffaf1eF;padding:6px 10px;border-radius:99px;font-size:10px;font-weight:700}
-.heart{position:absolute;top:10px;right:10px;width:34px;height:34px;border:0;border-radius:50%;background:#fffaf1eF;cursor:pointer;font-size:17px}
+.heart{position:absolute;top:10px;right:10px;width:34px;height:34px;border:0;border-radius:50%;background:#fffaf1ef;cursor:pointer;font-size:22px;display:grid;place-items:center;z-index:2}
 .heart.liked{color:#c85578}
 .product-info{padding:15px 5px 0}
 .product-category{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#b17a8b;font-weight:700}
@@ -548,8 +548,9 @@ function renderProducts() {
       <div class="product-card-inner">
         <div class="product-card-face product-card-front">
           <div class="product-image">
-            <img src="${p.image}" alt="${p.name}" loading="lazy">
+            <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.onerror=null;this.style.display='none';this.parentElement.style.background='#f0e5dc';this.parentElement.insertAdjacentHTML('beforeend','<div style=&quot;display:grid;place-items:center;height:100%;font-size:70px&quot;>${p.emoji}</div>')">
             <span class="tag">${p.tag}</span>
+            <button class="heart" type="button" aria-label="Show love for ${p.name}" aria-pressed="false">&#9825;</button>
             
           </div>
           <div class="product-info">
@@ -564,7 +565,7 @@ function renderProducts() {
           </div>
         </div>
         <div class="product-card-face product-card-back" aria-hidden="true" inert>
-          ${(() => { const first = (p.images || []).find(Boolean) || p.image; return first ? `<div class="product-flip-photo"><img class="product-flip-image" src="${escapeProductText(first)}" alt="${p.name} product photo" loading="lazy"></div>` : ""; })()}
+          ${(() => { const first = p.image || (p.images || []).find(Boolean); return first ? `<div class="product-flip-photo"><img class="product-flip-image" src="${escapeProductText(first)}" alt="${p.name} product photo" loading="lazy"></div>` : ""; })()}
           <div class="product-info">
             <div class="product-category">HANDMADE WITH LOVE · ${p.category}</div>
             <h3>${p.name}</h3>
@@ -582,10 +583,10 @@ function renderProducts() {
 
   Array.from(grid.querySelectorAll(".product-card")).forEach((card, index) => {
     const product = filtered[index];
-    const allImages = [...(product.images || []), product.image]
+    const allImages = [product.image, ...(product.images || [])]
       .filter((url, imageIndex, list) => url && list.indexOf(url) === imageIndex);
     card._flipImages = allImages;
-    card.dataset.flipImageIndex = allImages.length > 1 ? "0" : "-1";
+    card.dataset.flipImageIndex = "0";
   });
   scheduleCardFlips();
 }
@@ -610,15 +611,22 @@ function setCardFace(card, flipped) {
   const back = card.querySelector(".product-card-back");
   if (!front || !back) return;
 
-  if (flipped) {
-    const images = Array.isArray(card._flipImages) ? card._flipImages : [];
-    const image = back.querySelector(".product-flip-image");
-    if (images.length && image) {
-      const currentIndex = Number(card.dataset.flipImageIndex ?? "-1");
-      const nextIndex = (currentIndex + 1) % images.length;
-      card.dataset.flipImageIndex = String(nextIndex);
-      image.src = images[nextIndex];
-      image.alt = "Additional product photo " + (nextIndex + 2);
+  const images = Array.isArray(card._flipImages) ? card._flipImages : [];
+  const frontImage = front.querySelector(".product-image img");
+  const backImage = back.querySelector(".product-flip-image");
+
+  // Advance exactly one photo on every face change.
+  if (images.length > 1) {
+    const currentIndex = Number(card.dataset.flipImageIndex ?? "0");
+    const nextIndex = (currentIndex + 1) % images.length;
+    card.dataset.flipImageIndex = String(nextIndex);
+
+    if (flipped && backImage) {
+      backImage.src = images[nextIndex];
+      backImage.alt = "Product photo " + (nextIndex + 1);
+    } else if (!flipped && frontImage) {
+      frontImage.src = images[nextIndex];
+      frontImage.alt = "Product photo " + (nextIndex + 1);
     }
   }
 
